@@ -9,3 +9,9 @@ Choose a video, seek to a clear frame, drag a textured selection, and track. The
 Export records the output canvas in real time using MediaRecorder, selecting a supported WebM or MP4 encoder. Export is silent and timing depends on browser rendering performance; it is not a deterministic frame-by-frame encoder. Keep the tab visible. Source decoding and export codecs depend on the browser. Tracking JSON includes analysis-space positions and dimensions for conversion to source coordinates.
 
 This first version follows translation, not rotation or scale. Low-confidence matches hold the last known position and are flagged. Occlusion, uniform selections, large motion outside the search radius, and appearance changes can cause loss or drift. Reselect at a later frame to process a new segment. Long or high-resolution videos can take substantial time. No server, external runtime dependencies, or AI service is required.
+
+## GitHub Pages
+
+The app uses relative asset and module paths, so it works at a project URL such as `https://ufo-files.github.io/object-stabilizer/`. The `dist/` directory is the complete static site; no build or backend is needed.
+
+To publish, choose **Settings → Pages → Source → GitHub Actions**, then run **Actions → Deploy to GitHub Pages → Run workflow**. Deployment is manual; pushing source does not publish automatically. Repository/account eligibility for Pages must be enabled in GitHub settings.
