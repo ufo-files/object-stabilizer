@@ -1,0 +1,11 @@
+# Object Stabilizer
+
+A dependency-free, entirely browser-side video object stabilizer. Video files are opened through local object URLs; video pixels and tracking data are never uploaded.
+
+Run `npm run dev`, then open http://localhost:8080. Run `npm test` for tracker checks.
+
+Choose a video, seek to a clear frame, drag a textured selection, and track. The selected frame is the start of the output clip. Tracking samples at 15, 24, or 30 fps and uses fixed-template normalized cross correlation on an analysis image capped at 960 pixels wide. Each rendered frame is translated to put the tracked selection center at the output center. Optional zoom reduces exposed black edges.
+
+Export records the output canvas in real time using MediaRecorder, selecting a supported WebM or MP4 encoder. Export is silent and timing depends on browser rendering performance; it is not a deterministic frame-by-frame encoder. Keep the tab visible. Source decoding and export codecs depend on the browser. Tracking JSON includes analysis-space positions and dimensions for conversion to source coordinates.
+
+This first version follows translation, not rotation or scale. Low-confidence matches hold the last known position and are flagged. Occlusion, uniform selections, large motion outside the search radius, and appearance changes can cause loss or drift. Reselect at a later frame to process a new segment. Long or high-resolution videos can take substantial time. No server, external runtime dependencies, or AI service is required.
