@@ -6,7 +6,7 @@ const analysis=document.createElement('canvas'), ac=analysis.getContext('2d',{wi
 let focus=null,anchor=null,view={x:480,y:270,zoom:1};
 let box=null,drag=null,rows=[],start=0,busy=false,cancelled=false,url=null,playing=false,recorder=null,downloadUrl=null;
 const status=t=>$('status').textContent=t;
-const controls=()=>{ $('file').disabled=busy; $('seek').disabled=busy||!url; $('track').disabled=busy||!box; for(const id of ['preview','export','json'])$(id).disabled=busy||!rows.length; $('cancel').hidden=!busy; for(const id of ['fps','radius','zoom','mode','patch','sourceZoom','fit','zoomIn','zoomOut'])$(id).disabled=busy; $('zoom').disabled=busy||!rows.length; $('outputZoomControl').hidden=!rows.length; };
+const controls=()=>{ $('file').disabled=busy; $('seek').disabled=busy||!url; $('track').disabled=busy||!box; for(const id of ['preview','export','json'])$(id).disabled=busy||!rows.length; $('cancel').hidden=!busy; for(const id of ['fps','radius','mode','patch','sourceZoom','fit','zoomIn','zoomOut'])$(id).disabled=busy; };
 function reset(){rows=[];$('progress').value=0;$('confidence').textContent='—';controls();}
 function paint(){
  if(!video.videoWidth)return;
@@ -20,10 +20,15 @@ function paint(){
 }
 function read(){ac.drawImage(video,0,0,analysis.width,analysis.height);return gray(ac.getImageData(0,0,analysis.width,analysis.height).data);}
 function centered(row){
- const zoom=Number($('zoom').value),x=row.x*video.videoWidth/analysis.width,y=row.y*video.videoHeight/analysis.height;
+ const zoom=view.zoom,x=row.x*video.videoWidth/analysis.width,y=row.y*video.videoHeight/analysis.height;
  out.fillStyle='#000';out.fillRect(0,0,output.width,output.height);
  out.save();out.translate(output.width/2,output.height/2);out.scale(zoom,zoom);out.drawImage(video,-x,-y);out.restore();
- $('confidence').textContent=`Match ${Math.round(row.confidence*100)}%${row.confidence<.45?' · uncertain, position held':''}`;
+ $('confidence').textContent=Number.isFinite(row.confidence)?`Match ${Math.round(row.confidence*100)}%${row.confidence<.45?' · uncertain, position held':''} · ${view.zoom.toFixed(2)}×`:`${view.zoom.toFixed(2)}× · same zoom as input`;
+}
+function refreshOutput(){
+ if(!video.videoWidth||video.readyState<2)return;
+ const target=anchor||(box?{x:box.x+box.w/2,y:box.y+box.h/2}:view);
+ centered(rows.length?rowAt(video.currentTime):{x:target.x,y:target.y,confidence:null});
 }
 function seek(t){return new Promise((resolve,reject)=>{
  if(Math.abs(video.currentTime-t)<.00001&&video.readyState>=2){resolve();return;}
@@ -55,7 +60,7 @@ function canvasPoint(e){const r=source.getBoundingClientRect();return {x:(e.clie
 function point(e){const p=sourcePoint(canvasPoint(e),view,source.width,source.height);return {x:Math.max(0,Math.min(source.width-1,p.x)),y:Math.max(0,Math.min(source.height-1,p.y))};}
 function setZoom(zoom,at={x:source.width/2,y:source.height/2}){
  view=zoomAt(view,at,Math.max(1,Math.min(16,zoom)),source.width,source.height);
- $('sourceZoom').value=view.zoom;$('sourceZoomValue').textContent=`${view.zoom.toFixed(2).replace(/\.?0+$/,'')}×`;paint();
+ $('sourceZoom').value=view.zoom;$('sourceZoomValue').textContent=`${view.zoom.toFixed(2).replace(/\.?0+$/,'')}×`;paint();refreshOutput();
 }
 source.addEventListener('wheel',e=>{if(busy||!url)return;e.preventDefault();focus=point(e);setZoom(view.zoom*Math.exp(-e.deltaY*.002),canvasPoint(e));},{passive:false});
 function zoomToTarget(zoom){
@@ -67,9 +72,9 @@ $('sourceZoom').oninput=()=>zoomToTarget(Number($('sourceZoom').value));
 $('zoomIn').onclick=()=>zoomToTarget(view.zoom*1.5);
 $('zoomOut').onclick=()=>zoomToTarget(view.zoom/1.5);
 source.ondblclick=e=>{if(busy||!url)return;focus=point(e);view.x=focus.x;view.y=focus.y;setZoom(view.zoom*2);};
-$('fit').onclick=()=>{view={x:source.width/2,y:source.height/2,zoom:1};$('sourceZoom').value=1;$('sourceZoomValue').textContent='1×';paint();};
+$('fit').onclick=()=>{view={x:source.width/2,y:source.height/2,zoom:1};$('sourceZoom').value=1;$('sourceZoomValue').textContent='1×';paint();refreshOutput();};
 function selectPoint(p){focus=p;anchor=p;box=pointBox(p,Math.max(8,Math.min(128,Number($('patch').value)||24)),source.width,source.height);}
-function selectionReady(){start=video.currentTime;$('selection').textContent=`${anchor?'Point · ':''}${Math.round(box.w)} × ${Math.round(box.h)} px`;status('Selection ready. Track the object to create a centered preview.');paint();controls();}
+function selectionReady(){start=video.currentTime;$('selection').textContent=`${anchor?'Point · ':''}${Math.round(box.w)} × ${Math.round(box.h)} px`;status('Selection ready. Track the object to create a centered preview.');paint();refreshOutput();controls();}
 source.onpointerdown=e=>{
  if(busy||!url||video.readyState<2)return;stop();
  const pan=e.shiftKey||e.button===2||$('mode').value==='pan';
@@ -118,10 +123,9 @@ function finishPlayback(){playing=false;video.pause();if(recorder&&recorder.stat
 video.onended=finishPlayback;
 async function play(){await seek(start);paint();centered(rows[0]);playing=true;await video.play();loop();}
 $('preview').onclick=async()=>{busy=true;cancelled=false;controls();try{status('Playing centered preview…');await play();}catch(e){playing=false;busy=false;controls();status(e.message);}};
-$('zoom').oninput=()=>{if(rows.length)centered(rowAt(video.currentTime));};
 for(const id of ['fps','radius'])$(id).onchange=()=>{reset();status('Settings changed. Track the selection again.');};
 function download(blob,name){if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=downloadUrl;a.download=name;a.click();}
-$('json').onclick=()=>download(new Blob([JSON.stringify({source:$('file').files[0].name,sourceWidth:video.videoWidth,sourceHeight:video.videoHeight,analysisWidth:analysis.width,analysisHeight:analysis.height,selection:box,anchor,fps:Number($('fps').value),start,rows},null,2)],{type:'application/json'}),'tracking.json');
+$('json').onclick=()=>download(new Blob([JSON.stringify({source:$('file').files[0].name,sourceWidth:video.videoWidth,sourceHeight:video.videoHeight,analysisWidth:analysis.width,analysisHeight:analysis.height,selection:box,anchor,zoom:view.zoom,fps:Number($('fps').value),start,rows},null,2)],{type:'application/json'}),'tracking.json');
 $('export').onclick=async()=>{
  if(!window.MediaRecorder||!output.captureStream){status('Video export is unavailable in this browser. You can save tracking data instead.');return;}
  const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/mp4','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));

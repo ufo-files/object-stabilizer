@@ -27,8 +27,8 @@ test('selection zoom redraws the source frame and click uses zoomed coordinates'
   const rect=calls.find(c=>c[0]==='strokeRect');
   assert.deepEqual(rect.slice(1),[400.5,193,24,24],'clicked patch must map back to original pixels');
   assert.equal(get('track').disabled,false);
-  assert.equal(get('outputZoomControl').hidden,true,'output zoom stays hidden before tracking');
-  calls.length=0;get('zoomIn').onclick();assert.ok(calls.some(c=>c[0]==='scale'&&c[1]===6));
+  assert.ok(calls.some(c=>c[0]==='drawImage'&&c[1]===get('video')&&c[2]===-412.5&&c[3]===-205),'centered output uses the selected target');
+  calls.length=0;get('zoomIn').onclick();assert.equal(calls.filter(c=>c[0]==='scale'&&c[1]===6).length,2,'input and output both render at 6x');
   calls.length=0;get('fit').onclick();assert.ok(calls.some(c=>c[0]==='scale'&&c[1]===1));
  }finally{globalThis.document=originalDocument;URL.revokeObjectURL(get('video').src);}
 });
