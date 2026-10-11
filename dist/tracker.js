@@ -5,9 +5,10 @@ export function gray(rgba) {
  return out;
 }
 export class Tracker {
- constructor(data,width,height,box) {
+ constructor(data,width,height,box,anchor) {
   this.width=width; this.height=height;
-  this.x=box.x+box.w/2; this.y=box.y+box.h/2;
+  this.x=anchor?.x ?? box.x+box.w/2; this.y=anchor?.y ?? box.y+box.h/2;
+  this.small=Math.min(box.w,box.h)<=32;
   this.points=[]; let sum=0;
   const step=Math.max(1,Math.ceil(Math.max(box.w,box.h)/24));
   for(let y=Math.ceil(box.y);y<box.y+box.h;y+=step)
@@ -31,14 +32,15 @@ export class Tracker {
  }
  update(data,radius=30) {
   const ox=this.x,oy=this.y; let best={x:ox,y:oy,confidence:this.score(data,ox,oy)};
-  const step=Math.max(1,Math.ceil(radius/12));
+  // Small subjects can fall between coarse search samples. Search every pixel.
+  const step=this.small?1:Math.max(1,Math.min(3,Math.ceil(radius/12)));
   const search=(cx,cy,r,s)=>{
    for(let dy=-r;dy<=r;dy+=s)for(let dx=-r;dx<=r;dx+=s){
     const x=cx+dx,y=cy+dy,confidence=this.score(data,x,y);
     if(confidence>best.confidence)best={x,y,confidence};
    }
   };
-  search(ox,oy,radius,step); search(best.x,best.y,step,1);
+  search(ox,oy,Math.ceil(radius),step); if(step>1)search(best.x,best.y,step,1);
   if(best.confidence>=.45){this.x=best.x;this.y=best.y;}
   return {x:this.x,y:this.y,confidence:best.confidence};
  }

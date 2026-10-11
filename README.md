@@ -4,7 +4,7 @@ A dependency-free, entirely browser-side video object stabilizer. Video files ar
 
 Run `npm run dev`, then open http://localhost:8080. Run `npm test` for tracker checks.
 
-Choose a video, seek to a clear frame, drag a textured selection, and track. The selected frame is the start of the output clip. Tracking samples at 15, 24, or 30 fps and uses fixed-template normalized cross correlation on an analysis image capped at 960 pixels wide. Each rendered frame is translated to put the tracked selection center at the output center. Optional zoom reduces exposed black edges.
+Choose a video, seek to a clear frame, zoom in with the mouse wheel and click the object (or switch to box selection), and track. The selected frame is the start of the output clip. Tracking samples at 15, 24, or 30 fps and uses fixed-template normalized cross correlation at the original video resolution. Each rendered frame is translated to put the tracked selection center at the output center. Shift-drag pans the source frame, and source zoom reaches 16×. Point selection uses an adjustable patch centered on the exact clicked pixel. Small patches use an exhaustive pixel search to avoid skipping tiny targets. Output zoom reduces exposed black edges.
 
 Export records the output canvas in real time using MediaRecorder, selecting a supported WebM or MP4 encoder. Export is silent and timing depends on browser rendering performance; it is not a deterministic frame-by-frame encoder. Keep the tab visible. Source decoding and export codecs depend on the browser. Tracking JSON includes analysis-space positions and dimensions for conversion to source coordinates.
 
