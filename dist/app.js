@@ -3,7 +3,7 @@ import {sourcePoint,zoomAt,pointBox} from './viewport.js';
 const $=id=>document.getElementById(id), video=$('video'), source=$('source'), output=$('output');
 const ctx=source.getContext('2d'), out=output.getContext('2d');
 const analysis=document.createElement('canvas'), ac=analysis.getContext('2d',{willReadFrequently:true});
-let anchor=null,view={x:480,y:270,zoom:1};
+let focus=null,anchor=null,view={x:480,y:270,zoom:1};
 let box=null,drag=null,rows=[],start=0,busy=false,cancelled=false,url=null,playing=false,recorder=null,downloadUrl=null;
 const status=t=>$('status').textContent=t;
 const controls=()=>{ $('file').disabled=busy; $('seek').disabled=busy||!url; $('track').disabled=busy||!box; for(const id of ['preview','export','json'])$(id).disabled=busy||!rows.length; $('cancel').hidden=!busy; for(const id of ['fps','radius','zoom','mode','patch','sourceZoom','fit','zoomIn','zoomOut'])$(id).disabled=busy; $('zoom').disabled=busy||!rows.length; $('outputZoomControl').hidden=!rows.length; };
@@ -36,7 +36,7 @@ function stop(){playing=false;video.pause();if(recorder&&recorder.state!=='inact
 $('file').onchange=async()=>{
  stop();if(url)URL.revokeObjectURL(url);box=null;reset();
  const file=$('file').files[0];if(!file)return;
- url=URL.createObjectURL(file);video.src=url;anchor=null;
+ url=URL.createObjectURL(file);video.src=url;anchor=null;focus=null;
  status('Loading video…');
 };
 video.onloadeddata=()=>{
@@ -57,12 +57,18 @@ function setZoom(zoom,at={x:source.width/2,y:source.height/2}){
  view=zoomAt(view,at,Math.max(1,Math.min(16,zoom)),source.width,source.height);
  $('sourceZoom').value=view.zoom;$('sourceZoomValue').textContent=`${view.zoom.toFixed(2).replace(/\.?0+$/,'')}×`;paint();
 }
-source.addEventListener('wheel',e=>{if(busy||!url)return;e.preventDefault();setZoom(view.zoom*Math.exp(-e.deltaY*.002),canvasPoint(e));},{passive:false});
-$('sourceZoom').oninput=()=>setZoom(Number($('sourceZoom').value));
-$('zoomIn').onclick=()=>setZoom(view.zoom*1.5);
-$('zoomOut').onclick=()=>setZoom(view.zoom/1.5);
+source.addEventListener('wheel',e=>{if(busy||!url)return;e.preventDefault();focus=point(e);setZoom(view.zoom*Math.exp(-e.deltaY*.002),canvasPoint(e));},{passive:false});
+function zoomToTarget(zoom){
+ const target=anchor||focus||{x:view.x,y:view.y};
+ view.x=target.x;view.y=target.y;
+ setZoom(zoom);
+}
+$('sourceZoom').oninput=()=>zoomToTarget(Number($('sourceZoom').value));
+$('zoomIn').onclick=()=>zoomToTarget(view.zoom*1.5);
+$('zoomOut').onclick=()=>zoomToTarget(view.zoom/1.5);
+source.ondblclick=e=>{if(busy||!url)return;focus=point(e);view.x=focus.x;view.y=focus.y;setZoom(view.zoom*2);};
 $('fit').onclick=()=>{view={x:source.width/2,y:source.height/2,zoom:1};$('sourceZoom').value=1;$('sourceZoomValue').textContent='1×';paint();};
-function selectPoint(p){anchor=p;box=pointBox(p,Math.max(8,Math.min(128,Number($('patch').value)||24)),source.width,source.height);}
+function selectPoint(p){focus=p;anchor=p;box=pointBox(p,Math.max(8,Math.min(128,Number($('patch').value)||24)),source.width,source.height);}
 function selectionReady(){start=video.currentTime;$('selection').textContent=`${anchor?'Point · ':''}${Math.round(box.w)} × ${Math.round(box.h)} px`;status('Selection ready. Track the object to create a centered preview.');paint();controls();}
 source.onpointerdown=e=>{
  if(busy||!url||video.readyState<2)return;stop();
@@ -73,7 +79,7 @@ source.onpointerdown=e=>{
 };
 source.oncontextmenu=e=>e.preventDefault();
 source.onpointermove=e=>{
- if(!drag)return;
+ if(!drag){if(!busy&&url)focus=point(e);return;}
  if(drag.pan){const p=canvasPoint(e);view.x=drag.view.x-(p.x-drag.screen.x)/view.zoom;view.y=drag.view.y-(p.y-drag.screen.y)/view.zoom;paint();return;}
  if($('mode').value==='box'){const p=point(e);box={x:Math.min(drag.p.x,p.x),y:Math.min(drag.p.y,p.y),w:Math.abs(drag.p.x-p.x),h:Math.abs(drag.p.y-p.y)};paint();}
 };
