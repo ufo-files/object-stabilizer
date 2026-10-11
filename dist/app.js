@@ -6,7 +6,7 @@ const analysis=document.createElement('canvas'), ac=analysis.getContext('2d',{wi
 let anchor=null,view={x:480,y:270,zoom:1};
 let box=null,drag=null,rows=[],start=0,busy=false,cancelled=false,url=null,playing=false,recorder=null,downloadUrl=null;
 const status=t=>$('status').textContent=t;
-const controls=()=>{ $('file').disabled=busy; $('seek').disabled=busy||!url; $('track').disabled=busy||!box; for(const id of ['preview','export','json'])$(id).disabled=busy||!rows.length; $('cancel').hidden=!busy; for(const id of ['fps','radius','zoom','mode','patch','sourceZoom','fit'])$(id).disabled=busy; };
+const controls=()=>{ $('file').disabled=busy; $('seek').disabled=busy||!url; $('track').disabled=busy||!box; for(const id of ['preview','export','json'])$(id).disabled=busy||!rows.length; $('cancel').hidden=!busy; for(const id of ['fps','radius','zoom','mode','patch','sourceZoom','fit','zoomIn','zoomOut'])$(id).disabled=busy; $('zoom').disabled=busy||!rows.length; $('outputZoomControl').hidden=!rows.length; };
 function reset(){rows=[];$('progress').value=0;$('confidence').textContent='—';controls();}
 function paint(){
  if(!video.videoWidth)return;
@@ -59,6 +59,8 @@ function setZoom(zoom,at={x:source.width/2,y:source.height/2}){
 }
 source.addEventListener('wheel',e=>{if(busy||!url)return;e.preventDefault();setZoom(view.zoom*Math.exp(-e.deltaY*.002),canvasPoint(e));},{passive:false});
 $('sourceZoom').oninput=()=>setZoom(Number($('sourceZoom').value));
+$('zoomIn').onclick=()=>setZoom(view.zoom*1.5);
+$('zoomOut').onclick=()=>setZoom(view.zoom/1.5);
 $('fit').onclick=()=>{view={x:source.width/2,y:source.height/2,zoom:1};$('sourceZoom').value=1;$('sourceZoomValue').textContent='1×';paint();};
 function selectPoint(p){anchor=p;box=pointBox(p,Math.max(8,Math.min(128,Number($('patch').value)||24)),source.width,source.height);}
 function selectionReady(){start=video.currentTime;$('selection').textContent=`${anchor?'Point · ':''}${Math.round(box.w)} × ${Math.round(box.h)} px`;status('Selection ready. Track the object to create a centered preview.');paint();controls();}
