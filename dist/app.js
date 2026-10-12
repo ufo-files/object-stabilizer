@@ -1,4 +1,4 @@
-import {Tracker,gray,MotionSmoother,MIN_CONFIDENCE,interpolateTrack} from './tracker.js';
+import {Tracker,gray,MotionSmoother,MIN_CONFIDENCE,interpolateTrack,refineTrack} from './tracker.js';
 import {sourcePoint,zoomAt,pointBox} from './viewport.js';
 const $=id=>document.getElementById(id), video=$('video'), source=$('source'), output=$('output');
 const ctx=source.getContext('2d'), out=output.getContext('2d');
@@ -23,7 +23,7 @@ function centered(row){
  const zoom=view.zoom,x=row.x*video.videoWidth/analysis.width,y=row.y*video.videoHeight/analysis.height;
  out.fillStyle='#000';out.fillRect(0,0,output.width,output.height);
  out.save();out.translate(output.width/2,output.height/2);out.scale(zoom,zoom);out.drawImage(video,-x,-y);out.restore();
- $('confidence').textContent=Number.isFinite(row.confidence)?`Match ${Math.round(row.confidence*100)}%${row.accepted===false||row.confidence<MIN_CONFIDENCE?' · uncertain, position held':''} · ${view.zoom.toFixed(2)}×`:`${view.zoom.toFixed(2)}× · same zoom as input`;
+ $('confidence').textContent=Number.isFinite(row.confidence)?`Match ${Math.round(row.confidence*100)}%${row.accepted===false||row.confidence<MIN_CONFIDENCE?(row.reconstructed?' · estimated between reliable matches':' · uncertain, position held'):''} · ${view.zoom.toFixed(2)}×`:`${view.zoom.toFixed(2)}× · same zoom as input`;
 }
 function refreshOutput(){
  if(!video.videoWidth||video.readyState<2)return;
@@ -115,7 +115,7 @@ $('track').onclick=async()=>{
    await new Promise(resolve=>setTimeout(resolve,0));
   }
   if(cancelled){rows=[];status('Tracking cancelled.');}
-  else{const uncertain=rows.filter(r=>r.accepted===false).length;status(`Tracked ${rows.length} frames. ${uncertain} uncertain matches.${uncertain?' Inspect the preview before exporting.':''}`);await seek(start);paint();centered(rows[0]);}
+  else{rows=refineTrack(rows,view.zoom);const uncertain=rows.filter(r=>r.accepted===false).length;status(`Tracked ${rows.length} frames. ${uncertain} uncertain matches.${uncertain?' Inspect the preview before exporting.':''}`);await seek(start);paint();centered(rows[0]);}
  }catch(e){rows=[];status(e.message);}finally{busy=false;controls();}
 };
 function rowAt(t){return interpolateTrack(rows,t);}

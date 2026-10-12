@@ -81,3 +81,42 @@ export function interpolateTrack(rows,time){
  const a=rows[lo],b=rows[hi],t=(time-a.time)/(b.time-a.time);
  return {...a,x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};
 }
+
+// Offline, centered local fit: preserve steady motion without causal filter lag.
+export function refineTrack(rows,zoom=1){
+ if(!rows.length)return [];
+ const result=rows.map(r=>({...r}));
+ const valid=[];
+ for(let i=0;i<rows.length;i++)if(rows[i].accepted!==false&&rows[i].confidence>=MIN_CONFIDENCE)valid.push(i);
+ const position=r=>({x:r.rawX??r.x,y:r.rawY??r.y});
+ for(const i of valid){
+  const target=position(rows[i]);let weight=0,st=0,stt=0,sx=0,sy=0,stx=0,sty=0;
+  for(let j=Math.max(0,i-2);j<=Math.min(rows.length-1,i+2);j++){
+   const r=rows[j];if(r.accepted===false||r.confidence<MIN_CONFIDENCE)continue;
+   const t=r.time-rows[i].time,w=r.confidence,p=position(r);
+   weight+=w;st+=w*t;stt+=w*t*t;sx+=w*p.x;sy+=w*p.y;stx+=w*t*p.x;sty+=w*t*p.y;
+  }
+  const denominator=weight*stt-st*st;
+  const fit=denominator>1e-9?{x:(sx*stt-stx*st)/denominator,y:(sy*stt-sty*st)/denominator}:target;
+  // Smoothing may displace a trusted target by at most two output pixels.
+  const dx=fit.x-target.x,dy=fit.y-target.y,d=Math.hypot(dx,dy),limit=2/Math.max(1,zoom);
+  const scale=d>limit?limit/d:1;
+  result[i].x=target.x+dx*scale;result[i].y=target.y+dy*scale;
+  if(i===0){result[i].x=target.x;result[i].y=target.y;}
+ }
+ for(let k=0;k<valid.length;k++){
+  const a=valid[k],b=valid[k+1];
+  if(b===undefined){for(let j=a+1;j<result.length;j++){result[j].x=result[a].x;result[j].y=result[a].y;}break;}
+  const duration=rows[b].time-rows[a].time;
+  // Short gaps are reconstructed. Long gaps hold, then ease into recovery.
+  const transition=duration<=.4?duration:Math.min(.2,duration);
+  for(let j=a+1;j<b;j++){
+   const t=Math.max(0,Math.min(1,(rows[j].time-(rows[b].time-transition))/transition));
+   const blend=duration<=.4?t:t*t*(3-2*t);
+   result[j].x=result[a].x+(result[b].x-result[a].x)*blend;
+   result[j].y=result[a].y+(result[b].y-result[a].y)*blend;
+   result[j].reconstructed=t>0;
+  }
+ }
+ return result;
+}
