@@ -1,0 +1,169 @@
+{
+  "source": "02b43ebba81c502f57cdce5721308258.MP4",
+  "target": "User-confirmed bright point near the middle of the sky",
+  "mode": "bright",
+  "decoded_source_frames": 105,
+  "rejected_frames": 0,
+  "manual_review": {
+    "samples": 12,
+    "estimated_annotation_uncertainty_pixels": 1.0,
+    "mean_error_source_pixels": 0.34479029541906714,
+    "max_error_source_pixels": 0.5364435565010043,
+    "comparisons": [
+      {
+        "frame": 0,
+        "manual": [
+          1251.5,
+          521.0
+        ],
+        "tracked": [
+          1251.2555521583054,
+          520.6944558042875
+        ],
+        "error_source_pixels": 0.39129528855171924
+      },
+      {
+        "frame": 8,
+        "manual": [
+          1251.5,
+          521.0
+        ],
+        "tracked": [
+          1251.3252912603953,
+          520.8002590631683
+        ],
+        "error_source_pixels": 0.26536688855375234
+      },
+      {
+        "frame": 18,
+        "manual": [
+          1251.5,
+          521.0
+        ],
+        "tracked": [
+          1251.276568219381,
+          520.8011600275098
+        ],
+        "error_source_pixels": 0.2990971334708207
+      },
+      {
+        "frame": 28,
+        "manual": [
+          1251.5,
+          521.0
+        ],
+        "tracked": [
+          1251.3850915285695,
+          520.8434228447206
+        ],
+        "error_source_pixels": 0.19421730706057508
+      },
+      {
+        "frame": 38,
+        "manual": [
+          1251.5,
+          521.0
+        ],
+        "tracked": [
+          1251.4686419828847,
+          520.9303102755197
+        ],
+        "error_source_pixels": 0.07641978104879711
+      },
+      {
+        "frame": 48,
+        "manual": [
+          1251.5,
+          521.0
+        ],
+        "tracked": [
+          1251.468177790921,
+          520.9294868903178
+        ],
+        "error_source_pixels": 0.07736117648880446
+      },
+      {
+        "frame": 58,
+        "manual": [
+          1252.0,
+          521.0
+        ],
+        "tracked": [
+          1251.4682050973183,
+          520.9295310650482
+        ],
+        "error_source_pixels": 0.5364435565010043
+      },
+      {
+        "frame": 68,
+        "manual": [
+          1252.0,
+          521.0
+        ],
+        "tracked": [
+          1251.609373201124,
+          520.8838860227111
+        ],
+        "error_source_pixels": 0.40751902007379937
+      },
+      {
+        "frame": 78,
+        "manual": [
+          1252.0,
+          521.0
+        ],
+        "tracked": [
+          1251.6093781755437,
+          520.8838895435983
+        ],
+        "error_source_pixels": 0.4075132486525439
+      },
+      {
+        "frame": 88,
+        "manual": [
+          1252.0,
+          521.0
+        ],
+        "tracked": [
+          1251.6128573892183,
+          520.6326792563435
+        ],
+        "error_source_pixels": 0.5336702444423828
+      },
+      {
+        "frame": 98,
+        "manual": [
+          1252.0,
+          521.0
+        ],
+        "tracked": [
+          1251.6701398407786,
+          520.6592020655623
+        ],
+        "error_source_pixels": 0.47428995009230346
+      },
+      {
+        "frame": 104,
+        "manual": [
+          1252.0,
+          521.0
+        ],
+        "tracked": [
+          1251.6701398407786,
+          520.6592020655623
+        ],
+        "error_source_pixels": 0.47428995009230346
+      }
+    ]
+  },
+  "export": {
+    "zoom": 8,
+    "frames": 107,
+    "fps": 15.0,
+    "duration_seconds": 7.133333333333334,
+    "original_duration_seconds": 7.133,
+    "max_center_error_output_pixels": 1.7715105003913616,
+    "mean_center_error_output_pixels": 0.235065122447439
+  },
+  "limitations": "One nearly stationary bright point in a short night clip. Manual positions are approximate (\u00b11 source pixel). This does not validate moving objects, occlusion, or general scenes; those have synthetic regression checks."
+}

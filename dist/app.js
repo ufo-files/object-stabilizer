@@ -1,12 +1,14 @@
-import {Tracker,gray,MotionSmoother,MIN_CONFIDENCE,interpolateTrack,refineTrack} from './tracker.js';
+import {sampleTrack} from './playback.js';
+import {request,waitForJob} from './local-api.js';
 import {sourcePoint,zoomAt,pointBox} from './viewport.js';
 const $=id=>document.getElementById(id), video=$('video'), source=$('source'), output=$('output');
 const ctx=source.getContext('2d'), out=output.getContext('2d');
-const analysis=document.createElement('canvas'), ac=analysis.getContext('2d',{willReadFrequently:true});
+const analysis={width:0,height:0};
+let uploadedId=null,trackingJob=null;
 let focus=null,anchor=null,view={x:480,y:270,zoom:1};
-let box=null,drag=null,rows=[],start=0,busy=false,cancelled=false,url=null,playing=false,recorder=null,downloadUrl=null;
+let box=null,drag=null,rows=[],start=0,busy=false,cancelled=false,url=null,playing=false,downloadUrl=null;
 const status=t=>$('status').textContent=t;
-const controls=()=>{ $('file').disabled=busy; $('seek').disabled=busy||!url; $('track').disabled=busy||!box; for(const id of ['preview','export','json'])$(id).disabled=busy||!rows.length; $('cancel').hidden=!busy; for(const id of ['fps','radius','mode','patch','sourceZoom','fit','zoomIn','zoomOut'])$(id).disabled=busy; };
+const controls=()=>{ $('file').disabled=busy; $('seek').disabled=busy||!url; $('track').disabled=busy||!box; for(const id of ['preview','export','json'])$(id).disabled=busy||!rows.length; $('cancel').hidden=!busy; for(const id of ['radius','trackingMode','mode','patch','sourceZoom','fit','zoomIn','zoomOut'])$(id).disabled=busy; };
 function reset(){rows=[];$('progress').value=0;$('confidence').textContent='—';controls();}
 function paint(){
  if(!video.videoWidth)return;
@@ -18,12 +20,14 @@ function paint(){
  ctx.restore();
  $('time').textContent=video.currentTime.toFixed(2)+' s';
 }
-function read(){ac.drawImage(video,0,0,analysis.width,analysis.height);return gray(ac.getImageData(0,0,analysis.width,analysis.height).data);}
+
 function centered(row){
  const zoom=view.zoom,x=row.x*video.videoWidth/analysis.width,y=row.y*video.videoHeight/analysis.height;
  out.fillStyle='#000';out.fillRect(0,0,output.width,output.height);
- out.save();out.translate(output.width/2,output.height/2);out.scale(zoom,zoom);out.drawImage(video,-x,-y);out.restore();
- $('confidence').textContent=Number.isFinite(row.confidence)?`Match ${Math.round(row.confidence*100)}%${row.accepted===false||row.confidence<MIN_CONFIDENCE?(row.reconstructed?' · estimated between reliable matches':' · uncertain, position held'):''} · ${view.zoom.toFixed(2)}×`:`${view.zoom.toFixed(2)}× · same zoom as input`;
+ // OpenCV pixel centers are integer coordinates; Canvas image centers are n + 0.5.
+ const pixelOffset=Number.isFinite(row.confidence)?.5:0;
+ out.save();out.translate(output.width/2+pixelOffset,output.height/2+pixelOffset);out.scale(zoom,zoom);out.drawImage(video,-x-pixelOffset,-y-pixelOffset);out.restore();
+ $('confidence').textContent=Number.isFinite(row.confidence)?`Match ${Math.round(row.confidence*100)}%${row.accepted===false||row.confidence<.55?(row.reconstructed?' · estimated between reliable matches':' · uncertain, position held'):''} · ${view.zoom.toFixed(2)}×`:`${view.zoom.toFixed(2)}× · same zoom as input`;
 }
 function refreshOutput(){
  if(!video.videoWidth||video.readyState<2)return;
@@ -37,11 +41,11 @@ function seek(t){return new Promise((resolve,reject)=>{
  function finish(err){clearTimeout(timer);video.removeEventListener('seeked',done);video.removeEventListener('error',error);err?reject(err):resolve();}
  video.addEventListener('seeked',done,{once:true});video.addEventListener('error',error,{once:true});video.currentTime=t;
  });}
-function stop(){playing=false;video.pause();if(recorder&&recorder.state!=='inactive')recorder.stop();}
+function stop(){playing=false;video.pause();}
 $('file').onchange=async()=>{
  stop();if(url)URL.revokeObjectURL(url);box=null;reset();
  const file=$('file').files[0];if(!file)return;
- url=URL.createObjectURL(file);video.src=url;anchor=null;focus=null;
+ url=URL.createObjectURL(file);video.src=url;anchor=null;focus=null;uploadedId=null;trackingJob=null;
  status('Loading video…');
 };
 video.onloadeddata=()=>{
@@ -97,48 +101,45 @@ source.onpointerup=e=>{
 source.onpointercancel=()=>{drag=null;paint();controls();};
 $('patch').onchange=()=>{if(anchor){reset();selectPoint(anchor);selectionReady();}};
 $('mode').onchange=()=>{source.style.cursor=$('mode').value==='pan'?'grab':'crosshair';};
-$('cancel').onclick=()=>{const wasPlaying=playing;cancelled=true;stop();if(wasPlaying&&!recorder){busy=false;controls();status('Preview stopped.');}};
+$('cancel').onclick=()=>{const wasPlaying=playing;cancelled=true;stop();if(wasPlaying){busy=false;controls();status('Preview stopped.');}};
 $('track').onclick=async()=>{
- busy=true;cancelled=false;rows=[];controls();
+ busy=true;cancelled=false;rows=[];trackingJob=null;controls();
  try{
-  await seek(start);const scale=analysis.width/source.width;
-  const tracker=new Tracker(read(),analysis.width,analysis.height,{x:box.x*scale,y:box.y*scale,w:box.w*scale,h:box.h*scale},anchor?{x:anchor.x*scale,y:anchor.y*scale}:undefined);
-  const fps=Number($('fps').value),radius=Math.max(1,Math.min(500,Number($('radius').value)||100)*scale);
-  const smoother=new MotionSmoother(tracker.x,tracker.y,fps,Math.max(2,24/view.zoom));
-  const count=Math.ceil((video.duration-start)*fps);
-  for(let i=0;i<count;i++){
-   if(cancelled)break;
-   const t=start+i/fps;await seek(t);if(cancelled)break;
-   const row=smoother.update(i===0?{x:tracker.x,y:tracker.y,confidence:1,accepted:true}:tracker.update(read(),radius));
-   rows.push({time:t,...row});paint();centered(row);$('progress').value=(i+1)/count;
-   status(`Tracking frame ${i+1} / ${count}`);
-   await new Promise(resolve=>setTimeout(resolve,0));
+  status('Connecting to local Python tracker…');
+  let health;try{health=await request('/api/health');}catch{throw Error('Run the Python app locally, then open http://127.0.0.1:8080. GitHub Pages cannot run Python. See the repo README for setup.');}
+  if(health.engine!=='opencv')throw Error('This page is not connected to the Python tracker.');
+  if(!uploadedId){
+   status('Loading video into the local service…');
+   const form=new FormData();form.append('file',$('file').files[0]);
+   const uploaded=await request('/api/videos',{method:'POST',body:form});uploadedId=uploaded.id;
+   if(uploaded.width!==video.videoWidth||uploaded.height!==video.videoHeight){uploadedId=null;throw Error('Browser and Python disagree on video orientation. Convert this video to a standard MP4 first.');}
   }
-  if(cancelled){rows=[];status('Tracking cancelled.');}
-  else{rows=refineTrack(rows,view.zoom);const uncertain=rows.filter(r=>r.accepted===false).length;status(`Tracked ${rows.length} frames. ${uncertain} uncertain matches.${uncertain?' Inspect the preview before exporting.':''}`);await seek(start);paint();centered(rows[0]);}
+  if(cancelled)throw Error('Cancelled.');
+  const target=anchor||{x:box.x+box.w/2,y:box.y+box.h/2};
+  const job=await request('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({video_id:uploadedId,point:[Math.max(0,target.x-.5),Math.max(0,target.y-.5)],start,size:Math.max(8,Math.min(128,Math.round(Math.max(box.w,box.h)))),radius:Math.max(5,Math.min(500,Number($('radius').value)||100)),mode:$('trackingMode').value})});
+  const result=await waitForJob(job.id,(progress,message)=>{$('progress').value=progress;status(message);},()=>cancelled);
+  rows=result.rows;start=result.start;trackingJob=job.id;
+  await seek(start);paint();centered(rows[0]);
+  status(`Tracked ${rows.length} source frames at ${result.fps.toFixed(2)} fps. ${result.rejected} uncertain frames.${result.rejected?' Inspect flagged frames before exporting.':''}`);
  }catch(e){rows=[];status(e.message);}finally{busy=false;controls();}
 };
-function rowAt(t){return interpolateTrack(rows,t);}
-function loop(){if(!playing)return;paint();centered(rowAt(video.currentTime));if(video.ended){finishPlayback();return;}if(video.requestVideoFrameCallback)video.requestVideoFrameCallback(loop);else requestAnimationFrame(loop);}
-function finishPlayback(){playing=false;video.pause();if(recorder&&recorder.state!=='inactive')recorder.stop();else{busy=false;controls();status('Preview finished.');}}
+
+function rowAt(t){return sampleTrack(rows,t);}
+function loop(_now,metadata){if(!playing)return;paint();centered(rowAt(metadata?.mediaTime??video.currentTime));if(video.ended){finishPlayback();return;}if(video.requestVideoFrameCallback)video.requestVideoFrameCallback(loop);else requestAnimationFrame(loop);}
+function finishPlayback(){playing=false;video.pause();busy=false;controls();status('Preview finished.');}
 video.onended=finishPlayback;
 async function play(){await seek(start);paint();centered(rows[0]);playing=true;await video.play();loop();}
 $('preview').onclick=async()=>{busy=true;cancelled=false;controls();try{status('Playing centered preview…');await play();}catch(e){playing=false;busy=false;controls();status(e.message);}};
-for(const id of ['fps','radius'])$(id).onchange=()=>{reset();status('Settings changed. Track the selection again.');};
+for(const id of ['trackingMode','radius'])$(id).onchange=()=>{reset();status('Settings changed. Track the selection again.');};
 function download(blob,name){if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=downloadUrl;a.download=name;a.click();}
-$('json').onclick=()=>download(new Blob([JSON.stringify({source:$('file').files[0].name,sourceWidth:video.videoWidth,sourceHeight:video.videoHeight,analysisWidth:analysis.width,analysisHeight:analysis.height,selection:box,anchor,zoom:view.zoom,fps:Number($('fps').value),start,rows},null,2)],{type:'application/json'}),'tracking.json');
+$('json').onclick=()=>download(new Blob([JSON.stringify({source:$('file').files[0].name,sourceWidth:video.videoWidth,sourceHeight:video.videoHeight,analysisWidth:analysis.width,analysisHeight:analysis.height,selection:box,anchor,zoom:view.zoom,engine:'opencv',start,rows},null,2)],{type:'application/json'}),'tracking.json');
 $('export').onclick=async()=>{
- if(!window.MediaRecorder||!output.captureStream){status('Video export is unavailable in this browser. You can save tracking data instead.');return;}
- const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/mp4','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
- if(!mime){status('No supported export encoder found.');return;}
- busy=true;cancelled=false;controls();let stream;
+ if(!trackingJob){status('Track with the local Python service before exporting.');return;}
+ busy=true;cancelled=false;controls();
  try{
-  await seek(start);centered(rows[0]);stream=output.captureStream(Number($('fps').value));
-  recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:12000000});const chunks=[];
-  recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-  recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());if(!cancelled&&chunks.length){download(new Blob(chunks,{type:mime}),`stabilized.${mime.includes('mp4')?'mp4':'webm'}`);status('Export complete.');}else status('Export cancelled.');recorder=null;busy=false;controls();};
-  recorder.onerror=()=>{cancelled=true;stop();status('The browser encoder failed.');};
-  recorder.start(1000);status('Recording output… keep this tab visible.');await play();
- }catch(e){cancelled=true;stop();stream?.getTracks().forEach(t=>t.stop());busy=false;controls();status(e.message);}
+  const job=await request(`/api/jobs/${trackingJob}/export`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zoom:view.zoom})});
+  const result=await waitForJob(job.id,(progress,message)=>{$('progress').value=progress;status(message);},()=>cancelled);
+  const link=document.createElement('a');link.href=result.download;link.download='stabilized.mp4';link.click();
+  status(`MP4 export complete: ${result.frames} frames at ${result.fps.toFixed(2)} fps.`);
+ }catch(e){status(e.message);}finally{busy=false;controls();}
 };
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&recorder){cancelled=true;stop();status('Export cancelled because the tab was hidden.');}});
