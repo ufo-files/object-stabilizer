@@ -8,7 +8,7 @@ Choose a video, seek to a clear frame, zoom in with the mouse wheel and click th
 
 Export records the output canvas in real time using MediaRecorder, selecting a supported WebM or MP4 encoder. Export is silent and timing depends on browser rendering performance; it is not a deterministic frame-by-frame encoder. Keep the tab visible. Source decoding and export codecs depend on the browser. Tracking JSON includes analysis-space positions and dimensions for conversion to source coordinates.
 
-This first version follows translation, not rotation or scale. Low-confidence matches hold the last known position and are flagged. Occlusion, uniform selections, large motion outside the search radius, and appearance changes can cause loss or drift. Reselect at a later frame to process a new segment. Long or high-resolution videos can take substantial time. No server, external runtime dependencies, or AI service is required.
+This first version follows translation, not rotation or scale. Matches below 72% confidence hold position. Sudden jumps and recovery after lost tracking require three consistent matches. Accepted motion uses a 160 ms smoothing filter with a movement limit, and playback interpolates positions between samples. This trades a little centering lag for steadier output. Occlusion, uniform selections, large motion outside the search radius, and appearance changes can cause loss or drift. Reselect at a later frame to process a new segment. Long or high-resolution videos can take substantial time. No server, external runtime dependencies, or AI service is required.
 
 ## GitHub Pages
 

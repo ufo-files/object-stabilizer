@@ -1,4 +1,4 @@
-import {Tracker,gray} from './tracker.js';
+import {Tracker,gray,MotionSmoother,MIN_CONFIDENCE,interpolateTrack} from './tracker.js';
 import {sourcePoint,zoomAt,pointBox} from './viewport.js';
 const $=id=>document.getElementById(id), video=$('video'), source=$('source'), output=$('output');
 const ctx=source.getContext('2d'), out=output.getContext('2d');
@@ -23,7 +23,7 @@ function centered(row){
  const zoom=view.zoom,x=row.x*video.videoWidth/analysis.width,y=row.y*video.videoHeight/analysis.height;
  out.fillStyle='#000';out.fillRect(0,0,output.width,output.height);
  out.save();out.translate(output.width/2,output.height/2);out.scale(zoom,zoom);out.drawImage(video,-x,-y);out.restore();
- $('confidence').textContent=Number.isFinite(row.confidence)?`Match ${Math.round(row.confidence*100)}%${row.confidence<.45?' · uncertain, position held':''} · ${view.zoom.toFixed(2)}×`:`${view.zoom.toFixed(2)}× · same zoom as input`;
+ $('confidence').textContent=Number.isFinite(row.confidence)?`Match ${Math.round(row.confidence*100)}%${row.accepted===false||row.confidence<MIN_CONFIDENCE?' · uncertain, position held':''} · ${view.zoom.toFixed(2)}×`:`${view.zoom.toFixed(2)}× · same zoom as input`;
 }
 function refreshOutput(){
  if(!video.videoWidth||video.readyState<2)return;
@@ -104,20 +104,21 @@ $('track').onclick=async()=>{
   await seek(start);const scale=analysis.width/source.width;
   const tracker=new Tracker(read(),analysis.width,analysis.height,{x:box.x*scale,y:box.y*scale,w:box.w*scale,h:box.h*scale},anchor?{x:anchor.x*scale,y:anchor.y*scale}:undefined);
   const fps=Number($('fps').value),radius=Math.max(1,Math.min(500,Number($('radius').value)||100)*scale);
+  const smoother=new MotionSmoother(tracker.x,tracker.y,fps,Math.max(2,24/view.zoom));
   const count=Math.ceil((video.duration-start)*fps);
   for(let i=0;i<count;i++){
    if(cancelled)break;
    const t=start+i/fps;await seek(t);if(cancelled)break;
-   const row=i===0?{x:tracker.x,y:tracker.y,confidence:1}:tracker.update(read(),radius);
+   const row=smoother.update(i===0?{x:tracker.x,y:tracker.y,confidence:1,accepted:true}:tracker.update(read(),radius));
    rows.push({time:t,...row});paint();centered(row);$('progress').value=(i+1)/count;
    status(`Tracking frame ${i+1} / ${count}`);
    await new Promise(resolve=>setTimeout(resolve,0));
   }
   if(cancelled){rows=[];status('Tracking cancelled.');}
-  else{const uncertain=rows.filter(r=>r.confidence<.45).length;status(`Tracked ${rows.length} frames. ${uncertain} uncertain matches.${uncertain?' Inspect the preview before exporting.':''}`);await seek(start);paint();centered(rows[0]);}
+  else{const uncertain=rows.filter(r=>r.accepted===false).length;status(`Tracked ${rows.length} frames. ${uncertain} uncertain matches.${uncertain?' Inspect the preview before exporting.':''}`);await seek(start);paint();centered(rows[0]);}
  }catch(e){rows=[];status(e.message);}finally{busy=false;controls();}
 };
-function rowAt(t){const i=Math.min(rows.length-1,Math.max(0,Math.round((t-start)*Number($('fps').value))));return rows[i];}
+function rowAt(t){return interpolateTrack(rows,t);}
 function loop(){if(!playing)return;paint();centered(rowAt(video.currentTime));if(video.ended){finishPlayback();return;}if(video.requestVideoFrameCallback)video.requestVideoFrameCallback(loop);else requestAnimationFrame(loop);}
 function finishPlayback(){playing=false;video.pause();if(recorder&&recorder.state!=='inactive')recorder.stop();else{busy=false;controls();status('Preview finished.');}}
 video.onended=finishPlayback;
