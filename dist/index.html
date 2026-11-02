@@ -1,10 +1,37 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Object Stabilizer</title><link rel="stylesheet" href="style.css?v=python-local-7"></head>
-<body><main><header><span class="brand">◎ Object Stabilizer</span><span class="tag">PYTHON + OPENCV · LOCAL PROCESSING</span></header>
-<section class="intro"><p class="eyebrow">KEEP YOUR SUBJECT IN SIGHT</p><h1>A steady center.<br>A clearer view.</h1><p>Select an object. Track its motion. Keep it centered.<br>Your video stays on your computer.</p></section>
-<p class="local-help">This version uses the local Python app. Launch it with <code>python -m backend.server</code>, then open <a href="http://127.0.0.1:8080">127.0.0.1:8080</a>. <a href="https://github.com/ufo-files/object-stabilizer#local-setup">Setup instructions</a></p><section class="workspace"><aside><h2>01 / Load your video</h2><label class="upload">Choose a video<input id="file" type="file" accept="video/*"></label><p id="details">MP4, MOV, or WebM supported by your browser.</p>
-<h2>02 / Select the subject</h2><p>Seek to a clear frame, zoom in, and click the object. Tracking and export begin at that frame.</p><label>Start frame <input id="seek" type="range" min="0" max="1" step="0.001" value="0" disabled></label><span id="time">0.00 s</span>
-<div class="settings"><label>Selection mode<select id="mode"><option value="point">Click a point</option><option value="box">Draw a box</option><option value="pan">Pan the frame</option></select></label><label>Point tracking area (source pixels)<input id="patch" type="number" min="8" max="128" step="2" value="24"></label><p class="hint">Point at the object, then use the zoom slider, or double-click it to zoom. Scroll zooms at your pointer. Shift-drag to pan. Use a tracking area slightly larger than the object.</p><label>Target type<select id="trackingMode"><option value="bright">Bright point / night footage</option><option value="flow">Textured object / optical flow</option></select></label><label>Search radius (source pixels)<input id="radius" type="number" min="5" max="500" value="100"></label></div>
-<button id="track" disabled>Track selected object →</button><button id="cancel" hidden>Cancel</button><progress id="progress" max="1" value="0"></progress><p id="status" role="status" aria-live="polite">Choose a video to begin.</p>
-</aside><div class="views"><div class="view-head"><h2>Source / zoom and click</h2><span id="selection">No selection</span></div><div class="source-tools"><button id="zoomOut" type="button" aria-label="Zoom out of selection frame">−</button><label>Zoom to select <input id="sourceZoom" type="range" min="1" max="16" step=".25" value="1"></label><span id="sourceZoomValue">1×</span><button id="zoomIn" type="button" aria-label="Zoom into selection frame">+</button><button id="fit" type="button">Fit frame</button></div><div class="stage"><canvas id="source" width="960" height="540" aria-label="Video frame: zoom and click a subject, or draw a selection"></canvas><div id="empty">Your video appears here</div></div><div class="view-head"><h2>Centered output</h2><span id="confidence">—</span></div><canvas id="output" width="960" height="540" aria-label="Stabilized video preview"></canvas><div class="actions"><button id="preview" disabled>Play preview</button><button id="export" disabled>Export video</button><button id="json" disabled>Save tracking data</button></div><p class="note">Same zoom as input · translation stabilization · exposed edges are black · MP4 export processes every source frame locally and preserves source timing and audio when present.</p></div></section>
-<footer>Built for close observation. Select the subject closely and review any uncertain frames.</footer><video id="video" muted playsinline preload="auto" hidden></video></main><script type="module" src="app.js?v=python-local-7"></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tripod Stabilizer</title><link rel="stylesheet" href="/style.css?v=bundle-export-1">
+</head>
+<body><div class="topbar"><a class="brand" href="/" aria-label="UFO Files stabilizer home"><img src="/assets/logo.svg" alt=""><span><strong>UFO Files</strong><small>Video stabilizer</small></span></a><span class="build-tag">Experimental build</span></div><main>
+  <aside class="builder-panel">
+  <header><h1 id="heading">Automatic scene stabilization.</h1><p id="intro">Estimate camera movement from background detail across the image. Preserve the full frame and rigid geometry.</p></header>
+  <section class="configuration"><h2><span class="step-number">1</span> Configure footage</h2><label for="mode">Stabilization target</label><select id="mode"><option value="scene" selected>Entire scene — automatic</option><option value="light">Selected light — manual</option></select><label class="upload">Load video <input id="file" type="file" accept="video/*"></label><p id="status" role="status">Choose a video filmed from a tripod. Automatic mode does not need a drawn selection.</p></section>
+  </aside><div class="workspace">
+  <div class="empty-state"><span class="empty-symbol" aria-hidden="true">＋</span><p class="eyebrow">Video workspace</p><h2>Start with your footage.</h2><p>Load a tripod video to review the scene, stabilize the frames, and inspect the export.</p></div>
+  <section id="selection" hidden>
+    <h2 id="selectionTitle">2. Review the scene</h2>
+    <p id="selectionHelp">Background references are detected automatically. Moving features are rejected during motion estimation.</p>
+    <div id="frameControls" class="frame-controls" hidden>
+      <label for="referenceFrame">Find the brightest frame</label>
+      <input id="referenceFrame" type="range" min="1" max="1" value="1" step="1" aria-label="Source video frame">
+      <div class="frame-actions"><button id="previousFrame" type="button" aria-label="Previous source frame">←</button><label for="referenceFrameNumber">Frame <input id="referenceFrameNumber" type="number" min="1" max="1" value="1" step="1"></label><span id="frameTotal"></span><button id="nextFrame" type="button" aria-label="Next source frame">→</button></div>
+      <p>Scrub to a clear, bright view of the moving light, then draw its box. Tracking follows it backward and forward from there.</p>
+    </div>
+    <p id="trackRange" role="status" hidden></p>
+    <label id="cropOption" hidden><input id="cropToSelection" type="checkbox"> Crop to selection</label>
+    <canvas id="canvas"></canvas><p id="coordinates"></p><button id="run" disabled>Stabilize every frame</button>
+  </section>
+  <section id="result" hidden>
+    <h2>3. Preview and download</h2><p>This is the stabilized video. Download one ZIP with the original, stabilized and all three AI-enhanced versions, plus their frames and processing records.</p>
+    <video id="output" controls playsinline loop></video><button id="retryPreview" hidden>Reload preview</button>
+    <p id="framing"></p><p id="segment" hidden></p><p id="qa"></p><p id="appearance"></p>
+    <div id="magnifier"><h3>Fixed-position magnifier</h3><p>A fixed area around the reference, up to 65 × 65 pixels, enlarged 6×. The crosshair stays fixed.</p>
+    <canvas id="inspector" width="390" height="390"></canvas></div>
+    <p id="exportQuality"></p>
+    <div class="download-bundle"><button id="download" type="button">Download ZIP</button><p id="bundleStatus" role="status">Includes the original video, stabilized video and frames, and mild, standard and strong AI-enhanced videos with matching frames.</p></div>
+  </section>
+  </div><footer>Full frame by default · Optional selection crop in selected-light mode · No scale, shear, or local warping</footer>
+</main><script type="module" src="/app.js?v=bundle-export-1"></script></body>
+</html>

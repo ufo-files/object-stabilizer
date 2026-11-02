@@ -4,6 +4,6 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "dev": "python -m backend.server"
+    "dev": ".venv/bin/python -m uvicorn backend.server:app --host 127.0.0.1 --port 8080"
   }
 }

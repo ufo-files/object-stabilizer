@@ -1,0 +1,22 @@
+const path=require('node:path'),assert=require('node:assert/strict'),fs=require('node:fs');
+const{execFileSync}=require('node:child_process');const{chromium}=require('../..//homepage-redesign/node_modules/playwright');
+(async()=>{const browser=await chromium.launch({headless:true});try{
+ const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));const base='http://127.0.0.1:8080';
+ await page.goto(base);assert.equal((await(await page.request.get(base+'/api/health')).json()).version,19);
+ const source=path.resolve('validation/artifacts/bundle-source.avi');await page.selectOption('#mode','light');await page.setInputFiles('#file',source);
+ await page.locator('#selection').waitFor({state:'visible',timeout:60000});assert.equal(await page.locator('#referenceFrame').getAttribute('max'),'11');
+ await page.locator('#referenceFrame').fill('6');await page.waitForFunction(()=>document.getElementById('status').textContent.startsWith('Source frame 6'));
+ const c=await page.locator('#canvas').boundingBox();await page.mouse.move(c.x+84/480*c.width,c.y+99/240*c.height);await page.mouse.down();await page.mouse.move(c.x+109/480*c.width,c.y+124/240*c.height,{steps:5});await page.mouse.up();await page.waitForFunction(()=>!document.getElementById('run').disabled);
+ assert.match(await page.locator('#trackRange').textContent(),/3.*9/);await page.check('#cropToSelection');await page.click('#run');await page.locator('#result').waitFor({state:'visible',timeout:60000});
+ assert.equal(await page.locator('#result button:visible').count(),1);assert.equal(await page.locator('#result select').count(),0);assert.equal(await page.locator('#download').textContent(),'Download ZIP');
+ const pending=page.waitForResponse(r=>r.url().endsWith('/bundle')&&r.request().method()==='POST');const downloaded=page.waitForEvent('download',{timeout:180000});await page.click('#download');const response=await pending;const jobId=(await response.json()).id;
+ const repeated=await page.request.post(response.url(),{data:{}});assert.equal((await repeated.json()).id,jobId,'Repeated clicks should reuse the same bundle job');
+ const zipPath=path.resolve('validation/artifacts/browser-complete-exports.zip');await(await downloaded).saveAs(zipPath);await page.waitForFunction(()=>!document.getElementById('download').disabled);
+ const job=await(await page.request.get(base+'/api/jobs/'+jobId)).json();assert.equal(job.status,'complete');assert.deepEqual(job.result.presets,['mild','standard','strong']);
+ const analysis=execFileSync('.venv/bin/python',['validation/audit_export_bundle.py',zipPath,source],{encoding:'utf8'});console.log(analysis.trim());
+ const again=page.waitForEvent('download');await page.click('#download');await(await again).saveAs(path.resolve('validation/artifacts/browser-complete-exports-repeat.zip'));
+ await page.evaluate(async()=>{const v=document.getElementById('output');v.loop=false;v.muted=true;v.currentTime=0;await v.play();await new Promise(resolve=>v.addEventListener('ended',resolve,{once:true}));});
+ await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.equal(await page.locator('#result button:visible').count(),1);await page.locator('#result').screenshot({path:'validation/artifacts/bundle-mobile.png'});assert.deepEqual(errors,[]);
+ fs.writeFileSync('validation/artifacts/bundle-browser-qa.json',JSON.stringify({job:job.result,audit:JSON.parse(analysis),oneDownloadButton:true,noExportSettings:true,errors},null,2));
+ console.log('Passed: one button, no export settings, automatic download, three AI presets, every PNG verified, source bytes unchanged, repeat download, playback and mobile.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

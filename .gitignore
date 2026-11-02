@@ -5,3 +5,11 @@ node_modules/
 __pycache__/
 .runs/
 validation/artifacts/
+/dist/review-*.webm
+/dist/review-*.mp4
+/dist/review-*.png
+/dist/review-*.json
+
+.models/
+
+.export-storage.json
