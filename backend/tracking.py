@@ -23,10 +23,35 @@ def crop(gray, point, radius):
     x1=min(w,int(math.ceil(x+radius+1)));y1=min(h,int(math.ceil(y+radius+1)))
     return gray[y0:y1,x0:x1],x0,y0
 
+def group_bright_regions(candidates,size):
+    """Keep nearby lobes of a changing silhouette together as one target.
+
+    Group around the strongest seed without chaining across the search window.
+    The selected footprint bounds the group, so a distant brighter light stays
+    a separate candidate.
+    """
+    remaining=sorted(candidates,key=lambda candidate:candidate[2],reverse=True)
+    result=[];radius=max(5,min(64,size/2))
+    while remaining:
+        seed=remaining.pop(0);members=[seed];others=[]
+        for candidate in remaining:
+            if candidate[1]>=.55 and candidate[2]>=seed[2]*.08 and np.linalg.norm(candidate[0]-seed[0])<=radius:
+                members.append(candidate)
+            else:others.append(candidate)
+        remaining=others
+        flux=sum(candidate[2] for candidate in members)
+        point=sum((candidate[0]*candidate[2] for candidate in members),np.zeros(2))/flux
+        confidence=sum(candidate[1]*candidate[2] for candidate in members)/flux
+        result.append((point,confidence,flux,max(candidate[3] for candidate in members)))
+    return result
+
 class BrightPointTracker:
     def __init__(self, frame, point, size=24, radius=100):
         self.position=np.array(point,dtype=float);self.velocity=np.zeros(2);self.radius=radius
-        self.size=max(8,min(128,size));self.lost=0;self.last_frame=grayscale(frame)
+        self.size=max(8,min(512,size));self.lost=0;self.last_frame=grayscale(frame)
+        # A narrow band-pass splits a defocused object into moving bright lobes.
+        # Match the background scale to the selected object to retain its full body.
+        self.background_scale=max(4,min(32,self.size/4))
         candidates=self.detect(frame,self.position,self.size/2)
         if not candidates:raise ValueError("No distinct bright point at this selection. Click its center or use textured-object mode.")
         # Initial click identifies the component, not the brightest unrelated object.
@@ -39,7 +64,7 @@ class BrightPointTracker:
         roi,x0,y0=crop(grayscale(frame),center,radius)
         if min(roi.shape,default=0)<5:return []
         data=roi.astype(np.float32)
-        signal=cv2.GaussianBlur(data,(0,0),.8)-cv2.GaussianBlur(data,(0,0),4)
+        signal=cv2.GaussianBlur(data,(0,0),.8)-cv2.GaussianBlur(data,(0,0),self.background_scale)
         noise=max(.35,float(np.median(np.abs(signal-np.median(signal)))*1.4826))
         threshold=max(2.5,noise*5)
         mask=(signal>threshold).astype(np.uint8)
@@ -57,7 +82,7 @@ class BrightPointTracker:
             peak=float(signal[labels==label].max());snr=peak/noise
             confidence=min(.999,max(0,1-math.exp(-(snr-4)/5)))
             result.append((point,confidence,flux,snr))
-        return result
+        return group_bright_regions(result,self.size)
 
     def update(self, frame):
         predicted=self.position+self.velocity
@@ -69,7 +94,9 @@ class BrightPointTracker:
         # Prefer temporal proximity; an unrelated brighter light must not steal lock.
         chosen=min(candidates,key=lambda c:np.linalg.norm(c[0]-predicted)+2*abs(math.log(c[2]/self.flux)))
         point,confidence,flux,_=chosen
-        allowed=max(12,min(self.radius, max(self.size, np.linalg.norm(self.velocity)*3+8)))
+        # A tiny selection identifies a star; it must not restrict camera motion
+        # to the star's diameter. Keep a separate, bounded motion allowance.
+        allowed=min(self.radius,max(32,self.size,np.linalg.norm(self.velocity)*3+8))
         if np.linalg.norm(point-predicted)>allowed:
             self.lost+=1;self.velocity*=.5
             return Observation(*self.position,confidence,False,"Candidate outside motion gate; position held")

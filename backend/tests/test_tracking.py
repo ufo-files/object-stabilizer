@@ -11,6 +11,35 @@ def point_image(x,y,brightness=180,seed=0,distractor=None):
     return np.clip(image,0,255).astype(np.uint8)
 
 class TrackingTests(unittest.TestCase):
+    def test_target_can_split_merge_and_rotate_without_switching_lobes(self):
+        yy,xx=np.mgrid[:160,:240]
+        def frame(x,y,phase,angle):
+            dx,dy=7*np.cos(angle),7*np.sin(angle)
+            image=np.full(xx.shape,30,dtype=float)
+            image+=(1-phase)*180*np.exp(-((xx-x)**2+(yy-y)**2)/3.4)
+            for sign in (-1,1):
+                image+=phase*90*np.exp(-((xx-x-sign*dx)**2+(yy-y-sign*dy)**2)/3.4)
+            return np.clip(image,0,255).astype(np.uint8)
+        tracker=BrightPointTracker(frame(80,70,0,0),(80,70),48,50)
+        for i,phase in enumerate([.5,1,1,.3,0,1,.7,1,0],1):
+            x,y=80+i*.7,70+i*.3
+            observation=tracker.update(frame(x,y,phase,i*.3))
+            self.assertTrue(observation.accepted)
+            self.assertLess(np.hypot(observation.x-x,observation.y-y),.4)
+
+    def test_blurred_two_lobed_object_stays_centered_as_a_whole(self):
+        yy,xx=np.mgrid[:180,:260]
+        def image(x,y):
+            values=20+100*np.exp(-((xx-x-10)**2+(yy-y)**2)/50)+100*np.exp(-((xx-x+10)**2+(yy-y)**2)/50)
+            return np.clip(values,0,255).astype(np.uint8)
+        tracker=BrightPointTracker(image(90,80),(90,80),96,60)
+        self.assertLess(np.linalg.norm(tracker.initial-[90,80]),.5)
+        for i in range(1,12):
+            x,y=90+i*2.3,80+i*.7
+            result=tracker.update(image(x,y))
+            self.assertTrue(result.accepted)
+            self.assertLess(np.hypot(result.x-x,result.y-y),.5)
+
     def test_subpixel_moving_point_with_noise_and_exposure_change(self):
         t=BrightPointTracker(point_image(50.3,60.7),(50,61),24,40)
         errors=[]
@@ -29,6 +58,13 @@ class TrackingTests(unittest.TestCase):
         self.assertFalse(lost.accepted);self.assertLess(abs(lost.x-80),.3)
         found=t.update(point_image(83,82,seed=3));self.assertTrue(found.accepted)
         self.assertLess(np.hypot(found.x-83,found.y-82),.3)
+    def test_tight_star_selection_survives_abrupt_camera_jumps(self):
+        tracker=BrightPointTracker(point_image(80,80),(80,80),12,100)
+        for i,(x,y) in enumerate([(80,80),(80,80),(80,98),(80,98),(101,80),(101,80),(80,80)]):
+            result=tracker.update(point_image(x,y,seed=i))
+            self.assertTrue(result.accepted,'a 12px selection must not impose a 12px camera-motion limit')
+            self.assertLess(np.hypot(result.x-x,result.y-y),.3)
+
     def test_distant_distractor_rejected(self):
         t=BrightPointTracker(point_image(80,80),(80,80),12,100)
         r=t.update(point_image(140,80));self.assertFalse(r.accepted)
