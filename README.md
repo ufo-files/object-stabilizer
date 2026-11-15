@@ -75,3 +75,10 @@ The earlier manual brightest-pixel implementation was rejected by the user. Hold
 A separate whole-reference restoration experiment was rejected because it changed recorded detail and created ringing around other lights and the moving object. It is not in the automatic or manual processing paths. Its review page records that rejection.
 
 Diagnostic artifacts under `validation/artifacts/` and generated review media under `dist/review-*` are local outputs, excluded from version control. They preserve failed candidates as well as measurements; their existence is not evidence of acceptance.
+
+
+## Current licensing
+
+Original UFO Files software is available under the **UFO Files Noncommercial Shared-Source License 1.0**: no commercial use; distributed derivatives and modified network services must provide corresponding source under the same terms. Original content is **CC BY-NC-SA 4.0**, only to the extent we control its rights.
+
+See [LICENSE](LICENSE), [LICENSE-CONTENT.txt](LICENSE-CONTENT.txt), and [LICENSING.md](LICENSING.md) for scope, exceptions, and the transition from prior grants. These are source-available terms, not an OSI-approved open-source license. Third-party materials and public-domain records retain their own status.
