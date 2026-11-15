@@ -1,0 +1,103 @@
+UFO Files Noncommercial Shared-Source License
+Version 1.0
+
+This is a custom source-available license, not the GNU GPL, AGPL,
+Mozilla Public License, or an OSI-approved open-source license.
+
+1. Scope and definitions
+
+The Licensor is the copyright holder offering a work under these terms.
+Covered Software means software expressly designated by that holder as
+covered by this license, and copyrightable modifications or derivative
+works based on that software. Independent works merely distributed with,
+communicating with, or used alongside Covered Software are not covered
+solely by that association.
+
+Noncommercial means not primarily intended for or directed toward
+commercial advantage or monetary compensation. A person's or organization's
+nonprofit status does not, by itself, establish that a use is Noncommercial.
+Commercial use includes selling or commercially licensing Covered Software,
+providing it as a paid service, and operating it primarily to support a
+commercial business. Separate written permission from the relevant rights
+holders is required for uses outside this license.
+
+Corresponding Source means the preferred form of the Covered Software for
+making modifications, including its modified source, interface definitions,
+dependency information, and scripts and instructions needed to build,
+install, and run it. It excludes general-purpose tools, system libraries,
+credentials, private user data, and separately licensed third-party works;
+identify required third-party dependencies and their applicable terms.
+
+2. Permission
+
+Subject to these terms, the Licensor grants a worldwide, royalty-free,
+nonexclusive copyright license to use, reproduce, study, modify, and
+distribute Covered Software solely for Noncommercial purposes. No permission
+for commercial use is granted by this license.
+
+To the extent the Licensor may grant them, this license also grants the
+patent rights necessarily infringed by the Licensor's contributions alone
+or combined with the Covered Software to which they were contributed,
+solely to exercise the permissions granted above.
+
+3. Shared-source derivatives
+
+When you distribute Covered Software, including modified versions or
+executables, you must provide its complete Corresponding Source under this
+same license, without additional restrictions. Deliver that source with the
+software or provide recipients a prominent, working, no-charge download
+link that remains available for at least three years after your last
+such distribution. You may not substitute an unmodified upstream version
+for the source corresponding to your distributed version.
+
+When you operate a modified version of Covered Software for other users
+over a network, prominently offer those users a no-charge download of that
+version's complete Corresponding Source under this same license. Keep the
+offer available throughout operation and for at least three years after
+last offering that version to those users. Private modifications not
+distributed or operated for other users need not be published.
+
+You must license your copyrightable contributions to the Covered Software
+under these same terms when sharing them. Preserve applicable copyright,
+attribution, license, and warranty notices. Clearly identify material
+modifications and include a copy of this license with distributed copies.
+
+4. Third-party works, prior grants, and other rights
+
+This license applies only to rights the Licensor controls. It does not
+replace licenses on third-party dependencies, fonts, photographs, documents,
+source footage, datasets, or other separately identified material. It does
+not impose restrictions on public-domain material or uses independently
+permitted by law. It does not revoke permissions already granted for earlier
+copies or versions under another license, including CC0 or Apache-2.0.
+
+No trademark, endorsement, privacy, publicity, or personal-data rights are
+granted. A separate content license may apply to original media, writing,
+data, annotations, or model artifacts, as expressly identified in the
+repository's licensing notice. Do not infer ownership of source material
+from its inclusion in a repository or training dataset.
+
+5. Termination
+
+Permissions under this license terminate if you breach its conditions.
+They are reinstated if you cure the breach within 30 days after first
+receiving notice from the Licensor, unless the Licensor has previously
+notified you of a breach of this license and reinstated your permissions.
+Termination does not terminate licenses of recipients who comply with
+these terms. Obligations to provide source for prior distributions remain.
+
+6. Disclaimer
+
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, COVERED SOFTWARE IS PROVIDED
+"AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NONINFRINGEMENT. NO LICENSOR OR CONTRIBUTOR IS LIABLE FOR CLAIMS, DAMAGES,
+OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE, EXCEPT WHERE
+APPLICABLE LAW DOES NOT PERMIT SUCH EXCLUSION.
+
+7. Versions
+
+This license grants rights under version 1.0 only. A later license version
+or different terms apply only if separately authorized by the relevant
+rights holder. Nothing here requires a recipient to surrender rights
+already validly granted under this version.
